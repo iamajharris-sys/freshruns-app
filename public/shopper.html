@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>fresh runs — shopper</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{--charcoal:#2D2D2D;--sky:#F5821F;--navy:#1A2B4A;--bg:#F4F6F8;--card:#FFFFFF;--line:#E4E9EE;--muted:#8A97A5;--green:#3BA55C;--amber:#E8A13A;--red:#D46A6A;}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--charcoal);overflow:hidden;position:fixed;width:100%;display:flex;flex-direction:column;}
+  .topbar{background:var(--navy);color:#fff;padding:12px 16px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;}
+  .who{display:flex;align-items:center;gap:10px;}
+  .who .av{width:34px;height:34px;border-radius:10px;background:var(--sky);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;}
+  .who b{font-size:15px;font-weight:700;}
+  .who span{font-size:11px;opacity:.65;display:block;margin-top:-1px;}
+  .livedot{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:20px;}
+  .livedot i{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 40px;}
+  .secttl{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:800;margin:6px 6px 10px;}
+  .qcard{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px;margin-bottom:11px;cursor:pointer;transition:transform .1s,border-color .15s;}
+  .qcard:active{transform:scale(.99);}
+  .qcard.placed{border-left:4px solid var(--sky);}
+  .qcard.shopping{border-left:4px solid var(--amber);}
+  .qcard .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+  .qcard .cust{font-weight:800;font-size:16px;}
+  .qcard .cust small{display:block;font-weight:500;color:var(--muted);font-size:12px;margin-top:2px;}
+  .qcard .stat{font-size:11px;font-weight:800;padding:5px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;}
+  .qcard .stat.placed{background:#FFF4EA;color:#C15A0C;}
+  .qcard .stat.shopping{background:#FEF6EA;color:#B87A28;}
+  .qcard .meta{display:flex;gap:14px;font-size:12.5px;color:var(--muted);font-weight:600;flex-wrap:wrap;}
+  .qcard .meta b{color:var(--navy);}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px;font-size:14px;line-height:1.5;}
+  .empty .em{font-size:40px;display:block;margin-bottom:12px;}
+  #pick{position:fixed;inset:0;z-index:100;background:var(--bg);transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);display:flex;flex-direction:column;}
+  #pick.show{transform:translateX(0);}
+  .ptop{background:var(--navy);color:#fff;padding:12px 14px;flex-shrink:0;display:flex;align-items:center;gap:12px;}
+  .ptop .back{background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:10px;font-size:18px;cursor:pointer;font-family:inherit;}
+  .ptop .pt{flex:1;}
+  .ptop .pt b{font-size:16px;font-weight:800;}
+  .ptop .pt span{font-size:11.5px;opacity:.7;display:block;}
+  .pcust{background:var(--card);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+  .pcust .a{font-size:12.5px;color:var(--muted);font-weight:600;}
+  .pcust .a b{color:var(--navy);}
+  .pbar{height:4px;background:var(--line);flex-shrink:0;}
+  .pbar i{display:block;height:100%;background:var(--green);width:0;transition:width .3s;}
+  .plist{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 220px;}
+  .psec{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:800;margin:12px 6px 7px;}
+  .prow{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px;margin-bottom:8px;display:flex;align-items:center;gap:11px;transition:all .15s;}
+  .prow.got{border-color:var(--green);background:#F1FAF3;}
+  .prow.oos{border-color:var(--amber);background:#FEF8EF;}
+  .prow.typed{border-style:dashed;border-color:var(--sky);background:#FFFBF6;}
+  .chk{width:30px;height:30px;border-radius:9px;border:2px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;cursor:pointer;background:#fff;}
+  .prow.got .chk{background:var(--green);border-color:var(--green);}
+  .prow.oos .chk{background:var(--amber);border-color:var(--amber);}
+  .pinfo{flex:1;min-width:0;}
+  .pinfo .n{font-weight:700;font-size:14.5px;line-height:1.2;}
+  .pinfo .q{font-size:12px;color:var(--muted);font-weight:600;margin-top:1px;}
+  .pinfo .tag{display:inline-block;background:var(--sky);color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;text-transform:uppercase;margin-top:3px;}
+  .pinfo .note{font-size:12px;color:var(--navy);font-style:italic;background:#FFF4EA;padding:4px 8px;border-radius:6px;margin-top:2px;display:inline-block;}
+  .pprice{flex-shrink:0;}
+  .pinp{width:74px;border:1px solid var(--line);border-radius:9px;padding:8px 6px;font-family:inherit;font-size:15px;font-weight:700;text-align:right;color:var(--charcoal);}
+  .pinp:focus{outline:none;border-color:var(--sky);background:#FFF7F0;}
+  .pactrow{display:flex;gap:6px;margin:-2px 0 9px;}
+  .mini{flex:1;font-size:11px;font-weight:700;padding:8px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--muted);cursor:pointer;font-family:inherit;}
+  .mini.on-oos{background:var(--amber);color:#fff;border-color:var(--amber);}
+  .dock{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(26,43,74,.12);padding:14px 16px calc(14px + env(safe-area-inset-bottom));z-index:20;}
+  .totrow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;}
+  .totrow .lab{font-size:13px;color:var(--muted);font-weight:600;}
+  .totrow .val{font-size:15px;font-weight:700;}
+  .grand{display:flex;justify-content:space-between;align-items:baseline;margin:8px 0 12px;padding-top:10px;border-top:1px solid var(--line);}
+  .grand .lab{font-size:15px;font-weight:800;}
+  .grand .val{font-size:26px;font-weight:800;color:var(--navy);letter-spacing:-1px;}
+  .reqbtn{width:100%;background:var(--sky);color:#fff;border:none;padding:16px;border-radius:14px;font-weight:800;font-size:16px;font-family:inherit;cursor:pointer;}
+  .reqbtn:active{transform:scale(.98);}
+  .reqbtn:disabled{background:var(--line);color:var(--muted);}
+  .reqbtn.waiting{background:var(--amber);}
+  .reqbtn.approved{background:var(--green);}
+  .toast{position:fixed;top:66px;left:50%;transform:translateX(-50%) translateY(-16px);background:var(--navy);color:#fff;padding:11px 17px;border-radius:11px;font-size:13px;font-weight:700;z-index:80;opacity:0;transition:.28s;box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:nowrap;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="who"><div class="av">A</div><div><b>alex</b><span>sprouts &middot; doubletree</span></div></div>
+  <div class="livedot"><i></i> live</div>
+</div>
+<div class="scroll" id="queue">
+  <div class="secttl">incoming orders</div>
+  <div id="qlist"><div class="empty"><span class="em">&#128266;</span>waiting for orders&hellip;<br>new ones appear here the moment they&rsquo;re placed.</div></div>
+</div>
+<div id="pick">
+  <div class="ptop">
+    <button class="back" onclick="closePick()">&larr;</button>
+    <div class="pt"><b id="pName">&mdash;</b><span id="pWindow"></span></div>
+  </div>
+  <div class="pcust"><span class="a" id="pAddr"></span><span class="a" id="pProg">0 of 0</span></div>
+  <div class="pbar"><i id="pBar"></i></div>
+  <div class="plist" id="pList"></div>
+  <div class="dock">
+    <div class="totrow"><span class="lab">groceries</span><span class="val" id="pSub">$0.00</span></div>
+    <div class="totrow"><span class="lab">service fee</span><span class="val" id="pFee">$7.00</span></div>
+    <div class="grand"><span class="lab">customer pays</span><span class="val" id="pGrand">$7.00</span></div>
+    <button class="reqbtn" id="pReq" onclick="requestApproval()" disabled>grab items to continue</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const SUPABASE_URL="https://ivxrocsvjlxtlidqnion.supabase.co";
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2eHJvY3N2amx4dGxpZHFuaW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc1OTcsImV4cCI6MjA5OTA1MzU5N30.4JGyApBSC-p7JXwDeyqoeRnTC62yBWCBBaezSi90HVU";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+const FEE=7.00;
+let ORDERS={}, currentOrder=null, ITEMS=[];
+const ACTIVE=['placed','shopping','awaiting_approval'];
+
+async function loadQueue(){
+  const { data, error } = await sb.from('fr_orders').select('*').in('status',ACTIVE).order('created_at',{ascending:true});
+  if(error){ console.error(error); return; }
+  ORDERS={}; data.forEach(o=>ORDERS[o.id]=o); renderQueue();
+}
+function renderQueue(){
+  const list=document.getElementById('qlist');
+  const arr=Object.values(ORDERS).filter(o=>ACTIVE.includes(o.status));
+  if(arr.length===0){ list.innerHTML='<div class="empty"><span class="em">&#128266;</span>waiting for orders&hellip;<br>new ones appear here the moment they&rsquo;re placed.</div>'; return; }
+  list.innerHTML='';
+  arr.forEach(o=>{
+    const st=o.status==='placed'?'placed':'shopping';
+    const when=new Date(o.created_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+    const winMap={asap:'ASAP',afternoon:'afternoon',evening:'evening'};
+    const card=document.createElement('div'); card.className='qcard '+st;
+    card.innerHTML='<div class="top"><div class="cust">'+(o.customer_name||'customer')+'<small>&#128205; '+(o.address||'')+'</small></div><div class="stat '+st+'">'+o.status.replace('_',' ')+'</div></div><div class="meta"><span>&#128340; <b>'+(winMap[o.delivery_window]||o.delivery_window||'&mdash;')+'</b></span><span>placed <b>'+when+'</b></span><span>est <b>$'+Number(o.est_groceries||0).toFixed(2)+'</b></span></div>';
+    card.onclick=()=>openPick(o.id);
+    list.appendChild(card);
+  });
+}
+
+sb.channel('fr-orders-live').on('postgres_changes',{event:'*',schema:'public',table:'fr_orders'}, payload=>{
+  const o=payload.new||payload.old;
+  if(payload.eventType==='DELETE'){ delete ORDERS[o.id]; }
+  else { ORDERS[o.id]=o; if(o.id===currentOrder && o.status==='approved'){ onApproved(); } }
+  renderQueue();
+  if(payload.eventType==='INSERT'){ toast('&#128309; new order from '+(o.customer_name||'a customer')); }
+}).subscribe();
+
+async function openPick(orderId){
+  currentOrder=orderId; const o=ORDERS[orderId];
+  document.getElementById('pName').textContent=o.customer_name||'customer';
+  document.getElementById('pWindow').textContent=(o.delivery_window||'')+' delivery';
+  document.getElementById('pAddr').innerHTML='&#128205; <b>'+(o.address||'')+'</b>';
+  if(o.status==='placed'){ await sb.from('fr_orders').update({status:'shopping',shopper:'alex'}).eq('id',orderId); o.status='shopping'; }
+  const { data, error } = await sb.from('fr_order_items').select('*').eq('order_id',orderId).order('created_at',{ascending:true});
+  if(error){ console.error(error); return; }
+  ITEMS=data; renderItems();
+  document.getElementById('pick').classList.add('show');
+}
+function closePick(){ document.getElementById('pick').classList.remove('show'); currentOrder=null; loadQueue(); }
+
+function isNote(it){ return it.name && it.name.indexOf('(note)')===0; }
+
+function renderItems(){
+  const list=document.getElementById('pList'); list.innerHTML='';
+  const secs={}, typed=[];
+  ITEMS.forEach(it=>{ if(it.is_typed) typed.push(it); else (secs[it.section||'other']=secs[it.section||'other']||[]).push(it); });
+  Object.entries(secs).forEach(([sec,arr])=>{
+    const h=document.createElement('div');h.className='psec';h.textContent=sec;list.appendChild(h);
+    arr.forEach(it=>appendRow(list,it));
+  });
+  if(typed.length){
+    const h=document.createElement('div');h.className='psec';h.innerHTML='&#128221; special requests';list.appendChild(h);
+    typed.forEach(it=>appendRow(list,it));
+  }
+  recalc();
+}
+function appendRow(list,it){
+  const note=isNote(it);
+  const row=document.createElement('div');
+  row.className='prow'+(it.item_status==='got'?' got':'')+(it.item_status==='oos'?' oos':'')+(it.is_typed?' typed':'');
+  const chk=document.createElement('div');chk.className='chk';
+  chk.textContent=it.item_status==='got'?'\u2713':(it.item_status==='oos'?'\u2715':'');
+  chk.onclick=()=>toggleGot(it);
+  const info=document.createElement('div');info.className='pinfo';
+  if(note){ info.innerHTML='<div class="note">'+(it.note||it.name.replace('(note) ',''))+'</div>'; }
+  else {
+    let s='<div class="n">'+it.name+'</div><div class="q">\u00d7'+it.qty+'</div>';
+    if(it.is_typed) s+='<span class="tag">typed request</span>';
+    info.innerHTML=s;
+  }
+  const pr=document.createElement('div');pr.className='pprice';
+  if(!note){
+    if(it.item_status==='got'){
+      const inp=document.createElement('input');inp.className='pinp';inp.type='number';inp.inputMode='decimal';
+      inp.placeholder=it.est_price?('$'+Number(it.est_price).toFixed(2)):'$0.00';
+      if(it.actual_price!=null)inp.value=it.actual_price;
+      inp.oninput=e=>{ it.actual_price=e.target.value===''?null:parseFloat(e.target.value); recalc(); };
+      inp.onblur=e=>{ if(e.target.value===''&&it.est_price){ it.actual_price=Number(it.est_price); } persistItem(it); recalc(); };
+      pr.appendChild(inp);
+    } else if(it.item_status==='oos'){ pr.innerHTML='<span class="q" style="color:var(--amber);font-weight:700">out</span>'; }
+    else { pr.innerHTML='<span class="q">est $'+Number(it.est_price||0).toFixed(2)+'</span>'; }
+  }
+  row.appendChild(chk);row.appendChild(info);if(!note)row.appendChild(pr);
+  list.appendChild(row);
+  if(!note){
+    const acts=document.createElement('div');acts.className='pactrow';
+    const oos=document.createElement('button');oos.className='mini'+(it.item_status==='oos'?' on-oos':'');
+    oos.textContent=it.item_status==='oos'?'\u2713 marked out':'mark out of stock';
+    oos.onclick=()=>markOos(it);
+    acts.appendChild(oos);
+    list.appendChild(acts);
+  }
+}
+async function toggleGot(it){
+  if(it.item_status==='got'){ it.item_status='pending'; it.actual_price=null; }
+  else { it.item_status='got'; if(it.actual_price==null && it.est_price!=null) it.actual_price=Number(it.est_price); }
+  await persistItem(it); renderItems();
+}
+async function markOos(it){
+  it.item_status = it.item_status==='oos'?'pending':'oos'; it.actual_price=null;
+  await persistItem(it); renderItems();
+}
+async function persistItem(it){
+  await sb.from('fr_order_items').update({item_status:it.item_status, actual_price:it.actual_price}).eq('id',it.id);
+}
+function recalc(){
+  let sub=0, got=0;
+  const shopItems=ITEMS.filter(it=>!isNote(it));
+  shopItems.forEach(it=>{ if(it.item_status==='got'){ got++; if(it.actual_price!=null) sub+=Number(it.actual_price); } });
+  const grand=sub+FEE, n=shopItems.length;
+  document.getElementById('pSub').textContent='$'+sub.toFixed(2);
+  document.getElementById('pGrand').textContent='$'+grand.toFixed(2);
+  document.getElementById('pProg').textContent=got+' of '+n;
+  document.getElementById('pBar').style.width=(n?got/n*100:0)+'%';
+  const btn=document.getElementById('pReq');
+  const allResolved=shopItems.every(it=>it.item_status==='got'||it.item_status==='oos');
+  if(got===0){ btn.disabled=true; btn.textContent='grab items to continue'; btn.className='reqbtn'; }
+  else if(!allResolved){ btn.disabled=false; btn.className='reqbtn'; btn.textContent='still shopping \u00b7 request when done'; }
+  else { btn.disabled=false; btn.className='reqbtn'; btn.textContent='\u2705 done \u2014 request approval'; }
+  window._grand=grand; window._sub=sub;
+}
+async function requestApproval(){
+  const btn=document.getElementById('pReq');
+  btn.className='reqbtn waiting';btn.textContent='\u23f3 sent \u2014 waiting for payment\u2026';btn.disabled=true;
+  await sb.from('fr_orders').update({status:'awaiting_approval', actual_groceries:Number(window._sub.toFixed(2)), total_charged:Number(window._grand.toFixed(2))}).eq('id',currentOrder);
+  toast('\u{1F4F2} approval request sent to customer');
+}
+function onApproved(){
+  const btn=document.getElementById('pReq');
+  btn.className='reqbtn approved';btn.textContent='\u2705 paid \u2014 check out at register now';btn.disabled=true;
+  toast('\u{1F4B3} customer paid! check out & scan receipt');
+}
+let _tt;
+function toast(msg){const t=document.getElementById('toast');t.innerHTML=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2600);}
+loadQueue();
+</script>
+</body>
+</html>

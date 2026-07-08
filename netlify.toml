@@ -1,0 +1,14 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+# Friendly redirect so /approve works without the .html
+[[redirects]]
+  from = "/approve"
+  to = "/approve.html"
+  status = 200
+
+[[redirects]]
+  from = "/shopper"
+  to = "/shopper.html"
+  status = 200

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>fresh runs — approve & pay</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{--charcoal:#2D2D2D;--sky:#F5821F;--navy:#1A2B4A;--bg:#F4F6F8;--card:#FFFFFF;--line:#E4E9EE;--muted:#8A97A5;--green:#3BA55C;--amber:#E8A13A;}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--charcoal);min-height:100%;display:flex;flex-direction:column;}
+  .topbar{background:var(--sky);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .topbar .dot{width:28px;height:28px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .topbar b{font-weight:800;font-size:17px;letter-spacing:-.3px;}
+  .topbar span{font-size:11px;opacity:.8;display:block;margin-top:-2px;}
+  .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 16px 160px;max-width:480px;margin:0 auto;width:100%;}
+  .hero{text-align:center;padding:8px 0 18px;}
+  .hero .shopper{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:6px 14px 6px 6px;margin-bottom:14px;font-size:13px;font-weight:700;color:var(--navy);}
+  .hero .shopper .av{width:26px;height:26px;border-radius:50%;background:var(--sky);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
+  .hero h1{font-size:23px;font-weight:800;letter-spacing:-.5px;line-height:1.2;margin-bottom:6px;}
+  .hero p{font-size:14px;color:var(--muted);font-weight:500;line-height:1.5;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;}
+  .card h3{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:800;margin-bottom:12px;}
+  .sec{margin-bottom:13px;}
+  .sec:last-child{margin-bottom:0;}
+  .sec .st{font-size:12.5px;font-weight:800;color:var(--navy);margin-bottom:6px;}
+  .line{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F4F7;}
+  .line:last-child{border-bottom:none;}
+  .line .nm{font-weight:600;font-size:14.5px;flex:1;}
+  .line .nm .qty{color:var(--muted);font-weight:700;font-size:12.5px;margin-left:5px;}
+  .line .pr{font-weight:700;font-size:14.5px;min-width:60px;text-align:right;}
+  .line.oos{opacity:.6;}
+  .line.oos .pr{color:var(--amber);font-size:12px;font-weight:800;}
+  .line.sub .nm::after{content:'substituted';font-size:9px;font-weight:800;background:var(--sky);color:#fff;padding:2px 6px;border-radius:5px;margin-left:7px;text-transform:uppercase;vertical-align:middle;}
+  .tag-typed{font-size:9px;font-weight:800;background:var(--sky);color:#fff;padding:2px 6px;border-radius:5px;margin-left:6px;text-transform:uppercase;vertical-align:middle;}
+  .totline{display:flex;justify-content:space-between;padding:6px 0;font-size:14px;}
+  .totline .l{color:var(--muted);font-weight:600;}
+  .totline .v{font-weight:700;}
+  .totline.grand{border-top:1.5px solid var(--line);margin-top:8px;padding-top:12px;}
+  .totline.grand .l{font-size:17px;font-weight:800;color:var(--charcoal);}
+  .totline.grand .v{font-size:26px;font-weight:800;color:var(--navy);letter-spacing:-.5px;}
+  .trust{display:flex;gap:10px;align-items:flex-start;background:#F1FAF3;border:1px solid #CDE9D5;border-radius:12px;padding:12px 13px;margin-top:12px;}
+  .trust .ic{font-size:17px;}
+  .trust p{font-size:12.5px;color:#2C7D45;font-weight:600;line-height:1.5;}
+  .paydock{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(26,43,74,.12);padding:14px 16px calc(16px + env(safe-area-inset-bottom));z-index:20;max-width:480px;margin:0 auto;}
+  .paytotal{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;}
+  .paytotal .l{font-size:14px;color:var(--muted);font-weight:700;}
+  .paytotal .v{font-size:22px;font-weight:800;color:var(--navy);}
+  .applepay{width:100%;background:#000;color:#fff;border:none;padding:16px;border-radius:13px;font-weight:700;font-size:17px;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:9px;}
+  .applepay:active{transform:scale(.98);}
+  .cardbtn{width:100%;background:var(--sky);color:#fff;border:none;padding:15px;border-radius:13px;font-weight:800;font-size:15px;font-family:inherit;cursor:pointer;}
+  .cardbtn:active{transform:scale(.98);}
+  .paynote{text-align:center;font-size:11px;color:var(--muted);margin-top:9px;font-weight:500;}
+  .stub{text-align:center;font-size:11px;color:var(--amber);margin-top:6px;font-weight:700;}
+  /* states */
+  #loading,#waiting,#paid,#notfound{display:none;text-align:center;padding:60px 24px;}
+  #loading.show,#waiting.show,#paid.show,#notfound.show{display:block;}
+  .spin{width:38px;height:38px;border:4px solid var(--line);border-top-color:var(--sky);border-radius:50%;margin:0 auto 16px;animation:sp 1s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  #waiting .big,#paid .big,#notfound .big{font-size:56px;margin-bottom:14px;}
+  #waiting h2,#paid h2,#notfound h2{font-size:22px;font-weight:800;margin-bottom:8px;letter-spacing:-.4px;}
+  #waiting p,#paid p,#notfound p{font-size:14.5px;color:var(--muted);font-weight:500;line-height:1.55;max-width:320px;margin:0 auto;}
+  #paid .steps{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:20px auto 0;max-width:340px;text-align:left;}
+  #paid .steps .s{display:flex;align-items:center;gap:11px;padding:7px 0;font-size:13.5px;font-weight:600;}
+  #paid .steps .s .n{width:24px;height:24px;border-radius:50%;background:#F1FAF3;color:var(--green);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+  .demobar{background:var(--navy);color:#fff;padding:9px 14px;font-size:11.5px;text-align:center;font-weight:600;}
+  .demobar b{color:var(--sky);}
+</style>
+</head>
+<body>
+<div class="demobar" id="demobar">demo: showing the most recent order awaiting approval &middot; <b id="dbInfo">loading&hellip;</b></div>
+<div class="topbar">
+  <div class="dot">&#128722;</div>
+  <div><b>fresh runs</b><span>review &amp; approve your order</span></div>
+</div>
+
+<div id="loading" class="show"><div class="spin"></div><p style="color:var(--muted);font-weight:600;">loading your order&hellip;</p></div>
+
+<div id="notfound"><div class="big">&#129300;</div><h2>no order to approve</h2><p>we couldn&rsquo;t find an order waiting for approval. once your shopper finishes and requests approval, this page will show your itemized cart.</p></div>
+
+<div class="scroll" id="main" style="display:none;">
+  <div class="hero">
+    <div class="shopper"><span class="av" id="shopAv">A</span> <span id="shopLine">alex finished shopping</span></div>
+    <h1>here&rsquo;s your order &mdash; approve to pay</h1>
+    <p>these are the real prices from the shelf. approve and pay the exact total, then we check out &amp; deliver.</p>
+  </div>
+
+  <div class="card">
+    <h3>your groceries</h3>
+    <div id="itemsWrap"></div>
+  </div>
+
+  <div class="card">
+    <h3>total</h3>
+    <div class="totline"><span class="l">groceries</span><span class="v" id="tGro">$0.00</span></div>
+    <div class="totline"><span class="l">service fee</span><span class="v" id="tFee">$7.00</span></div>
+    <div class="totline grand"><span class="l">you pay</span><span class="v" id="tGrand">$0.00</span></div>
+    <div class="trust"><span class="ic">&#128274;</span><p>this is the exact amount &mdash; nothing changes after you approve. any out-of-stock items were removed and aren&rsquo;t charged.</p></div>
+  </div>
+</div>
+
+<div class="paydock" id="payDock" style="display:none;">
+  <div class="paytotal"><span class="l">total</span><span class="v" id="payTotal">$0.00</span></div>
+  <button class="applepay" onclick="pay()">&#63743;&nbsp; Pay</button>
+  <button class="cardbtn" onclick="pay()">approve &amp; pay with card</button>
+  <div class="stub">&#9888;&#65039; stripe not wired yet &mdash; this button flips the order to &ldquo;paid&rdquo; for demo</div>
+</div>
+
+<div id="waiting"><div class="big">&#9203;</div><h2>almost there&hellip;</h2><p>your shopper is still adding items. this page will update automatically the moment your order is ready to approve.</p></div>
+
+<div id="paid"><div class="big">&#127881;</div><h2>paid &mdash; thank you!</h2><p>your neighbor is on the way. you&rsquo;ll get a text when it&rsquo;s at your door.</p>
+  <div class="steps">
+    <div class="s"><span class="n">&#10003;</span> order approved &amp; paid</div>
+    <div class="s"><span class="n">&#10003;</span> alex checking out at sprouts</div>
+    <div class="s"><span class="n">3</span> neighbor delivering to your door</div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL="https://ivxrocsvjlxtlidqnion.supabase.co";
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2eHJvY3N2amx4dGxpZHFuaW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc1OTcsImV4cCI6MjA5OTA1MzU5N30.4JGyApBSC-p7JXwDeyqoeRnTC62yBWCBBaezSi90HVU";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+const FEE_DEFAULT=7.00;
+let ORDER=null;
+
+function show(id){ ['loading','notfound','main','waiting','paid'].forEach(x=>{const e=document.getElementById(x);if(e)e.classList.remove('show');if(x==='main')document.getElementById('main').style.display='none';}); 
+  document.getElementById('payDock').style.display='none';
+  if(id==='main'){ document.getElementById('main').style.display='block'; document.getElementById('payDock').style.display='block'; }
+  else { const e=document.getElementById(id); if(e)e.classList.add('show'); }
+}
+
+// In production: order id comes from the SMS link (?o=<uuid>). For demo, grab most recent awaiting_approval.
+function getOrderIdFromUrl(){ const p=new URLSearchParams(location.search); return p.get('o'); }
+
+async function loadOrder(){
+  const id=getOrderIdFromUrl();
+  let q=sb.from('fr_orders').select('*');
+  let order=null;
+  if(id){ const {data}=await q.eq('id',id).single(); order=data; }
+  else {
+    const {data}=await sb.from('fr_orders').select('*').eq('status','awaiting_approval').order('created_at',{ascending:false}).limit(1);
+    order=data&&data[0];
+    // fallback: also show shopping orders so you can watch it flip
+    if(!order){ const {data:d2}=await sb.from('fr_orders').select('*').in('status',['shopping','placed','approved','paid']).order('created_at',{ascending:false}).limit(1); order=d2&&d2[0]; }
+  }
+  if(!order){ document.getElementById('dbInfo').textContent='no orders yet'; show('notfound'); return; }
+  ORDER=order;
+  document.getElementById('dbInfo').textContent='order '+order.id.slice(0,8)+' &middot; '+order.status.replace('_',' ');
+  await renderForStatus();
+}
+
+async function renderForStatus(){
+  const s=ORDER.status;
+  if(s==='paid'||s==='approved'||s==='checked_out'||s==='delivered'){ show('paid'); return; }
+  if(s==='awaiting_approval'){ await renderOrder(); show('main'); return; }
+  // placed / shopping -> still shopping
+  show('waiting');
+}
+
+async function renderOrder(){
+  const { data:items } = await sb.from('fr_order_items').select('*').eq('order_id',ORDER.id).order('created_at',{ascending:true});
+  const wrap=document.getElementById('itemsWrap'); wrap.innerHTML='';
+  const secs={}, typed=[];
+  (items||[]).forEach(it=>{ if(it.name&&it.name.indexOf('(note)')===0) return; if(it.is_typed) typed.push(it); else (secs[it.section||'other']=secs[it.section||'other']||[]).push(it); });
+  let gro=0;
+  const priceOf=it=> (it.item_status==='got'? Number(it.actual_price||0):0);
+  function lineHtml(it){
+    const oos=it.item_status==='oos';
+    const price=priceOf(it); gro+=price;
+    const cls='line'+(oos?' oos':'')+(it.item_status==='sub'?' sub':'');
+    const right= oos? 'out of stock' : '$'+price.toFixed(2);
+    const typedTag= it.is_typed? '<span class="tag-typed">requested</span>':'';
+    return '<div class="'+cls+'"><span class="nm">'+it.name+'<span class="qty">\u00d7'+it.qty+'</span>'+typedTag+'</span><span class="pr">'+right+'</span></div>';
+  }
+  Object.entries(secs).forEach(([sec,arr])=>{
+    let h='<div class="sec"><div class="st">'+sec+'</div>';
+    arr.forEach(it=>h+=lineHtml(it)); h+='</div>'; wrap.innerHTML+=h;
+  });
+  if(typed.length){ let h='<div class="sec"><div class="st">\u{1F4DD} special requests</div>'; typed.forEach(it=>h+=lineHtml(it)); h+='</div>'; wrap.innerHTML+=h; }
+  const fee=Number(ORDER.service_fee||FEE_DEFAULT);
+  const grand=gro+fee;
+  document.getElementById('tGro').textContent='$'+gro.toFixed(2);
+  document.getElementById('tFee').textContent='$'+fee.toFixed(2);
+  document.getElementById('tGrand').textContent='$'+grand.toFixed(2);
+  document.getElementById('payTotal').textContent='$'+grand.toFixed(2);
+  document.getElementById('shopLine').textContent=(ORDER.shopper||'your shopper')+' finished shopping';
+  document.getElementById('shopAv').textContent=(ORDER.shopper||'a').charAt(0).toUpperCase();
+  window._grand=grand;
+}
+
+// Realtime: when the shopper requests approval / we get paid, react live.
+sb.channel('fr-approve-live').on('postgres_changes',{event:'UPDATE',schema:'public',table:'fr_orders'}, payload=>{
+  const o=payload.new;
+  if(!ORDER || o.id===ORDER.id){ ORDER=o; document.getElementById('dbInfo').textContent='order '+o.id.slice(0,8)+' &middot; '+o.status.replace('_',' '); renderForStatus(); }
+}).subscribe();
+
+async function pay(){
+  const dock=document.getElementById('payDock'); dock.style.opacity='.6';
+  try{
+    const r = await fetch('/.netlify/functions/create-checkout', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ order_id: ORDER.id })
+    });
+    const data = await r.json();
+    if(!r.ok || !data.url){ throw new Error(data.error || 'could not start checkout'); }
+    // redirect to Stripe's hosted checkout (Apple Pay appears there automatically)
+    window.location.href = data.url;
+  }catch(e){
+    dock.style.opacity='1';
+    alert('payment could not start: '+(e.message||e));
+  }
+}
+
+// If we came back from Stripe with ?paid=1, verify server-side then show paid.
+async function checkReturnFromStripe(){
+  const p=new URLSearchParams(location.search);
+  if(p.get('paid')==='1' && p.get('o')){
+    show('loading');
+    try{
+      const r=await fetch('/.netlify/functions/confirm-payment',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({order_id:p.get('o')})
+      });
+      const data=await r.json();
+      if(data.paid){ show('paid'); return true; }
+    }catch(e){ console.error(e); }
+  }
+  return false;
+}
+
+(async function init(){
+  const returned = await checkReturnFromStripe();
+  if(!returned) loadOrder();
+})();
+</script>
+</body>
+</html>

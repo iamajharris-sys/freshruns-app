@@ -1,0 +1,9 @@
+{
+  "name": "freshruns-app",
+  "version": "1.0.0",
+  "description": "Fresh Runs — hyperlocal grocery delivery (Gainey Ranch beta)",
+  "private": true,
+  "dependencies": {
+    "stripe": "^17.0.0"
+  }
+}

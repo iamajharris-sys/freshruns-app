@@ -114,7 +114,7 @@
 const SUPABASE_URL="https://ivxrocsvjlxtlidqnion.supabase.co";
 const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2eHJvY3N2amx4dGxpZHFuaW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc1OTcsImV4cCI6MjA5OTA1MzU5N30.4JGyApBSC-p7JXwDeyqoeRnTC62yBWCBBaezSi90HVU";
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
-const FEE=7.00;
+let FEE=7.00;
 let ORDERS={}, currentOrder=null, ITEMS=[];
 const ACTIVE=['placed','shopping','awaiting_approval','approved','paid'];
 
@@ -191,7 +191,13 @@ async function openPick(orderId){
   document.getElementById('pick').classList.add('show');
   if(o.status==='paid'||o.status==='approved'){ onApproved(); }
 }
-function closePick(){ document.getElementById('pick').classList.remove('show'); currentOrder=null; loadQueue(); }
+function closePick(){ document.getElementById('pick').classList.remove('show'); currentOrder=null; async function loadFee(){
+  try{ const {data}=await sb.from('fr_settings').select('service_fee').eq('id',1).single();
+    if(data&&data.service_fee!=null){ FEE=Number(data.service_fee); document.getElementById('pFee').textContent='$'+FEE.toFixed(2); }
+  }catch(e){}
+}
+loadFee();
+loadQueue(); }
 
 function isNote(it){ return it.name && it.name.indexOf('(note)')===0; }
 
@@ -287,6 +293,12 @@ function onApproved(){
 }
 let _tt;
 function toast(msg){const t=document.getElementById('toast');t.innerHTML=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2600);}
+async function loadFee(){
+  try{ const {data}=await sb.from('fr_settings').select('service_fee').eq('id',1).single();
+    if(data&&data.service_fee!=null){ FEE=Number(data.service_fee); document.getElementById('pFee').textContent='$'+FEE.toFixed(2); }
+  }catch(e){}
+}
+loadFee();
 loadQueue();
 </script>
 </body>

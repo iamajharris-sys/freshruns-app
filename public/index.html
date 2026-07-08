@@ -613,6 +613,7 @@ function openReview(){
     // ADDRESS CARD
     html+=`<div class="rvcard"><h3>deliver to</h3>
       <div class="addr-conf"><span class="pin">&#128205;</span><span>${deliverAddress} &middot; gainey ranch</span></div>
+      <input class="rvfield" style="margin-top:10px" id="rvName" placeholder="your first name" />
       <input class="rvfield" style="margin-top:10px" id="rvPhone" placeholder="phone (for delivery texts)" inputmode="tel" />
       <input class="rvfield" id="rvGate" placeholder="gate code / delivery notes (optional)" />
     </div>`;
@@ -652,6 +653,9 @@ async function placeOrder(){
     const id = await saveOrderToSupabase();
     window._lastOrderId = id;
     document.getElementById('placed').classList.add('show');
+    // fire a friendly "we got your order" text (silent if Twilio not set up yet)
+    fetch('/.netlify/functions/send-sms',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({order_id:id,kind:'received'})}).catch(()=>{});
   }catch(e){
     console.error(e);
     alert('hmm, something went wrong saving your order. please try again.\n\n'+(e.message||e));
@@ -700,11 +704,14 @@ async function saveOrderToSupabase(){
   const gateEl  = document.getElementById('rvGate');
   const phone = phoneEl ? phoneEl.value.trim() : '';
   const gate  = gateEl ? gateEl.value.trim() : '';
+  const nameEl = document.getElementById('rvName');
+  const custName = nameEl ? nameEl.value.trim() : '';
 
   // 1) insert the order
   const { data: orderRows, error: oErr } = await sb.from('fr_orders').insert({
     address: deliverAddress,
     phone: phone || null,
+    customer_name: custName || null,
     gate_notes: gate || null,
     delivery_window: selectedWindow,
     status: 'placed',

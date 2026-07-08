@@ -285,6 +285,16 @@ async function requestApproval(){
   btn.className='reqbtn waiting';btn.textContent='\u23f3 sent \u2014 waiting for payment\u2026';btn.disabled=true;
   await sb.from('fr_orders').update({status:'awaiting_approval', actual_groceries:Number(window._sub.toFixed(2)), total_charged:Number(window._grand.toFixed(2))}).eq('id',currentOrder);
   toast('\u{1F4F2} approval request sent to customer');
+  // fire the SMS with the pay link (fails silently if Twilio not set up yet)
+  try{
+    const r=await fetch('/.netlify/functions/send-sms',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({order_id:currentOrder,kind:'approve'})
+    });
+    const d=await r.json();
+    if(d.sent){ toast('\u2709\ufe0f text sent to customer'); }
+    else if(d.error){ toast('\u26a0\ufe0f sms not sent: '+d.error); }
+  }catch(e){ console.warn('sms error',e); }
 }
 function onApproved(){
   const btn=document.getElementById('pReq');

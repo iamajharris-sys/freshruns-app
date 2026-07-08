@@ -532,7 +532,8 @@ function enterStore(){
 
 <script>
 // ===== review / checkout logic =====
-const FEE = 7.00;
+let FEE = 7.00;
+let ORDER_MIN = 0;
 // rough price anchors for common staples (demo). unknown -> DEFAULT_EST.
 const PRICE = {
   'bananas':1.79,'avocados':1.29,'strawberries':4.99,'baby spinach':3.49,'roma tomatoes':2.49,
@@ -637,6 +638,13 @@ function selWin(el,w){
 }
 async function placeOrder(){
   if(!selectedWindow){ alert('pick a delivery window first \u{1F642}'); return; }
+  if(ORDER_MIN>0){
+    const model=buildOrderModel();
+    if(model.estTotal < ORDER_MIN){
+      alert('minimum order is $'+ORDER_MIN.toFixed(2)+' in groceries.\nyou\u2019re at about $'+model.estTotal.toFixed(2)+' \u2014 add a little more and you\u2019re set \u{1F642}');
+      return;
+    }
+  }
   const btn=document.getElementById('placeBtn');
   const orig=btn.innerHTML;
   btn.disabled=true; btn.textContent='placing your order\u2026';
@@ -669,6 +677,21 @@ function resetAll(){
 const SUPABASE_URL = "https://ivxrocsvjlxtlidqnion.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2eHJvY3N2amx4dGxpZHFuaW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc1OTcsImV4cCI6MjA5OTA1MzU5N30.4JGyApBSC-p7JXwDeyqoeRnTC62yBWCBBaezSi90HVU";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// load fee + minimum from fr_settings (change them in Supabase, no redeploy needed)
+async function loadSettings(){
+  try{
+    const { data } = await sb.from('fr_settings').select('service_fee,order_minimum').eq('id',1).single();
+    if(data){
+      if(data.service_fee!=null) FEE=Number(data.service_fee);
+      if(data.order_minimum!=null) ORDER_MIN=Number(data.order_minimum);
+      // reflect fee in any static labels
+      const feeEls=document.querySelectorAll('[data-fee]');
+      feeEls.forEach(el=>el.textContent='$'+FEE.toFixed(2));
+    }
+  }catch(e){ console.warn('settings load failed, using defaults', e); }
+}
+loadSettings();
 
 // Write a placed order to fr_orders + fr_order_items. Returns the order id.
 async function saveOrderToSupabase(){

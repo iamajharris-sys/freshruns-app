@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fresh runs — beta dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --orange:#F5821F; --navy:#1A2B4A; --ink:#1A2B4A;
+    --bg:#FAFAF8; --card:#fff; --line:#EAE7E1; --muted:#7A8290;
+    --green:#2C7D45; --greenbg:#EAF7EE;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);padding:20px;max-width:1000px;margin:0 auto}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .logo{width:34px;height:34px;border-radius:9px;background:var(--orange);display:grid;place-items:center;color:#fff;font-size:18px}
+  h1{font-size:20px;font-weight:800;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .range{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .range button{border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 13px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+  .range button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:22px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .kpi .lab{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:7px}
+  .kpi .val{font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .kpi .val small{font-size:14px;font-weight:600;color:var(--muted)}
+  .kpi.hero{background:linear-gradient(135deg,#FFF3E7,#FFE9D3);border-color:#FAD8B4}
+  .kpi.hero .val{color:var(--orange)}
+  .section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .section h2{font-size:14px;font-weight:800;margin-bottom:14px}
+  .bar{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px}
+  .bar .name{width:120px;flex:none;color:var(--ink);font-weight:600}
+  .bar .track{flex:1;height:22px;background:#F1EEE8;border-radius:6px;overflow:hidden}
+  .bar .fill{height:100%;background:var(--orange);border-radius:6px}
+  .bar .n{width:64px;flex:none;text-align:right;color:var(--muted);font-weight:700}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  td.r,th.r{text-align:right}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+  .pill.paid{background:var(--greenbg);color:var(--green)}
+  .pill.deliv{background:#EAF0FA;color:var(--navy)}
+  .pill.other{background:#F1EEE8;color:var(--muted)}
+  .pitch{background:var(--navy);color:#fff;border-radius:14px;padding:20px;margin-bottom:16px;line-height:1.6;font-size:14px}
+  .pitch b{color:#FFC98A}
+  .empty{color:var(--muted);text-align:center;padding:30px;font-size:14px}
+  .foot{color:var(--muted);font-size:12px;text-align:center;margin-top:20px}
+  .refresh{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🛒</div>
+  <h1>fresh runs — beta dashboard</h1>
+  <button class="refresh" onclick="load()">↻ refresh</button>
+</header>
+<div class="sub">the numbers that turn a beta into a sprouts conversation.</div>
+
+<div class="range" id="range">
+  <button data-d="1">today</button>
+  <button data-d="7" class="on">last 7 days</button>
+  <button data-d="30">last 30 days</button>
+  <button data-d="9999">all time</button>
+</div>
+
+<div class="grid" id="kpis"></div>
+
+<div class="pitch" id="pitch"></div>
+
+<div class="section">
+  <h2>orders by day</h2>
+  <div id="byday"></div>
+</div>
+
+<div class="section">
+  <h2>where the demand is (by address)</h2>
+  <div id="byaddr"></div>
+</div>
+
+<div class="section">
+  <h2>recent orders</h2>
+  <div id="orders"></div>
+</div>
+
+<div class="foot">fresh runs · gainey ranch beta · data live from supabase</div>
+
+<script>
+const SUPABASE_URL='https://ivxrocsvjlxtlidqnion.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2eHJvY3N2amx4dGxpZHFuaW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc1OTcsImV4cCI6MjA5OTA1MzU5N30.4JGyApBSC-p7JXwDeyqoeRnTC62yBWCBBaezSi90HVU';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+let DAYS=7;
+document.getElementById('range').addEventListener('click',e=>{
+  if(e.target.dataset.d){
+    DAYS=Number(e.target.dataset.d);
+    [...document.querySelectorAll('#range button')].forEach(b=>b.classList.toggle('on',b===e.target));
+    render();
+  }
+});
+
+let ALL=[];
+async function load(){
+  const { data, error } = await sb.from('fr_orders').select('*').order('created_at',{ascending:false}).limit(1000);
+  if(error){ console.error(error); }
+  ALL=data||[];
+  render();
+}
+
+function inRange(o){
+  if(DAYS>=9999) return true;
+  const cutoff=Date.now()-DAYS*86400000;
+  return new Date(o.created_at).getTime()>=cutoff;
+}
+const money=n=>'$'+Number(n||0).toFixed(2);
+const paidStatuses=['paid','approved','checked_out','delivered'];
+const isPaid=o=>paidStatuses.includes(o.status);
+
+function render(){
+  const rows=ALL.filter(inRange);
+  const paid=rows.filter(isPaid);
+
+  // KPIs
+  const totalOrders=rows.length;
+  const paidOrders=paid.length;
+  const grocRev=paid.reduce((s,o)=>s+Number(o.actual_groceries||0),0);
+  const avgBasket=paidOrders? grocRev/paidOrders : 0;
+  const feeRev=paid.reduce((s,o)=>s+Number(o.total_charged||0)-Number(o.actual_groceries||0),0);
+  const conv=totalOrders? (paidOrders/totalOrders*100):0;
+
+  // speed: created_at -> delivered_at (fallback paid_at)
+  const speeds=paid.map(o=>{
+    const end=o.delivered_at||o.paid_at; if(!end) return null;
+    return (new Date(end)-new Date(o.created_at))/60000;
+  }).filter(x=>x!=null&&x>0&&x<600);
+  const avgSpeed=speeds.length? speeds.reduce((a,b)=>a+b,0)/speeds.length : null;
+
+  const kpis=[
+    {lab:'groceries driven to sprouts',val:money(grocRev),hero:true},
+    {lab:'paid orders',val:paidOrders},
+    {lab:'avg basket',val:money(avgBasket)},
+    {lab:'your fee revenue',val:money(feeRev)},
+    {lab:'avg speed (order→done)',val: avgSpeed!=null? Math.round(avgSpeed)+'<small> min</small>':'—'},
+    {lab:'order→paid conversion',val: Math.round(conv)+'<small>%</small>'},
+  ];
+  document.getElementById('kpis').innerHTML=kpis.map(k=>
+    `<div class="kpi${k.hero?' hero':''}"><div class="lab">${k.lab}</div><div class="val">${k.val}</div></div>`).join('');
+
+  // Sprouts pitch line (auto-generated from real data)
+  const pitchEl=document.getElementById('pitch');
+  if(paidOrders>0){
+    pitchEl.innerHTML=`<b>the sprouts pitch, in your own data:</b><br>
+      in this window, fresh runs drove <b>${money(grocRev)}</b> of incremental grocery sales to your
+      doubletree store across <b>${paidOrders} orders</b>, averaging <b>${money(avgBasket)}</b> per basket`+
+      (avgSpeed!=null?`, delivered in about <b>${Math.round(avgSpeed)} minutes</b> door to door`:``)+`.
+      instacart marks these customers up and takes a cut. we drove them at your real shelf prices —
+      and the demand is concentrated in one gated neighborhood you're not reaching today.`;
+  } else {
+    pitchEl.innerHTML=`<b>the sprouts pitch builds itself here.</b><br>once real orders come in, this box fills with the exact numbers to put in front of sprouts: incremental sales driven, average basket, delivery speed, and demand concentration.`;
+  }
+
+  // Orders by day
+  const dayMap={};
+  rows.forEach(o=>{
+    const d=new Date(o.created_at).toLocaleDateString([], {month:'short',day:'numeric'});
+    if(!dayMap[d]) dayMap[d]={orders:0,groc:0};
+    dayMap[d].orders++;
+    if(isPaid(o)) dayMap[d].groc+=Number(o.actual_groceries||0);
+  });
+  const days=Object.entries(dayMap);
+  const maxOrders=Math.max(1,...days.map(([,v])=>v.orders));
+  document.getElementById('byday').innerHTML = days.length? days.map(([d,v])=>
+    `<div class="bar"><div class="name">${d}</div><div class="track"><div class="fill" style="width:${v.orders/maxOrders*100}%"></div></div><div class="n">${v.orders} ord</div></div>`
+  ).join('') : '<div class="empty">no orders in this window yet.</div>';
+
+  // Demand by address
+  const addrMap={};
+  rows.forEach(o=>{ const a=(o.address||'—').trim(); addrMap[a]=(addrMap[a]||0)+1; });
+  const addrs=Object.entries(addrMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxA=Math.max(1,...addrs.map(([,n])=>n));
+  document.getElementById('byaddr').innerHTML = addrs.length? addrs.map(([a,n])=>
+    `<div class="bar"><div class="name" style="width:200px">${a}</div><div class="track"><div class="fill" style="width:${n/maxA*100}%"></div></div><div class="n">${n}×</div></div>`
+  ).join('') : '<div class="empty">no addresses yet.</div>';
+
+  // Recent orders table
+  const recent=rows.slice(0,25);
+  document.getElementById('orders').innerHTML = recent.length? `
+    <table><thead><tr>
+      <th>when</th><th>customer</th><th>status</th><th class="r">basket</th><th class="r">total</th>
+    </tr></thead><tbody>
+    ${recent.map(o=>{
+      const when=new Date(o.created_at).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      const cls=isPaid(o)?(o.status==='delivered'?'deliv':'paid'):'other';
+      return `<tr>
+        <td>${when}</td>
+        <td>${o.customer_name||'—'}</td>
+        <td><span class="pill ${cls}">${(o.status||'').replace('_',' ')}</span></td>
+        <td class="r">${o.actual_groceries?money(o.actual_groceries):'—'}</td>
+        <td class="r">${o.total_charged?money(o.total_charged):'—'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>` : '<div class="empty">no orders yet — place a test order and it shows up here.</div>';
+}
+
+load();
+// light auto-refresh every 30s
+setInterval(load, 30000);
+</script>
+</body>
+</html>

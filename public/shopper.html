@@ -30,6 +30,9 @@
   .qcard .stat{font-size:11px;font-weight:800;padding:5px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;}
   .qcard .stat.placed{background:#FFF4EA;color:#C15A0C;}
   .qcard .stat.shopping{background:#FEF6EA;color:#B87A28;}
+  .qcard .stat.paid{background:#EAF7EE;color:#2C7D45;}
+  .qcard.paidcard{border-left:4px solid var(--green);background:#F5FBF7;}
+  .qcard.paidcard .cust::after{content:' \2705';font-size:13px;}
   .qcard .meta{display:flex;gap:14px;font-size:12.5px;color:var(--muted);font-weight:600;flex-wrap:wrap;}
   .qcard .meta b{color:var(--navy);}
   .empty{text-align:center;color:var(--muted);padding:50px 20px;font-size:14px;line-height:1.5;}
@@ -113,7 +116,7 @@ const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 const FEE=7.00;
 let ORDERS={}, currentOrder=null, ITEMS=[];
-const ACTIVE=['placed','shopping','awaiting_approval'];
+const ACTIVE=['placed','shopping','awaiting_approval','approved','paid'];
 
 async function loadQueue(){
   const { data, error } = await sb.from('fr_orders').select('*').in('status',ACTIVE).order('created_at',{ascending:true});
@@ -124,13 +127,19 @@ function renderQueue(){
   const list=document.getElementById('qlist');
   const arr=Object.values(ORDERS).filter(o=>ACTIVE.includes(o.status));
   if(arr.length===0){ list.innerHTML='<div class="empty"><span class="em">&#128266;</span>waiting for orders&hellip;<br>new ones appear here the moment they&rsquo;re placed.</div>'; return; }
+  // sort: paid/approved first (needs action), then awaiting, then shopping, then placed
+  const rank=s=>({paid:0,approved:0,awaiting_approval:1,shopping:2,placed:3}[s]??9);
+  arr.sort((a,b)=>rank(a.status)-rank(b.status) || new Date(a.created_at)-new Date(b.created_at));
   list.innerHTML='';
   arr.forEach(o=>{
-    const st=o.status==='placed'?'placed':'shopping';
+    const paid = (o.status==='paid'||o.status==='approved');
+    const st = paid ? 'paid' : (o.status==='placed'?'placed':'shopping');
     const when=new Date(o.created_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
     const winMap={asap:'ASAP',afternoon:'afternoon',evening:'evening'};
-    const card=document.createElement('div'); card.className='qcard '+st;
-    card.innerHTML='<div class="top"><div class="cust">'+(o.customer_name||'customer')+'<small>&#128205; '+(o.address||'')+'</small></div><div class="stat '+st+'">'+o.status.replace('_',' ')+'</div></div><div class="meta"><span>&#128340; <b>'+(winMap[o.delivery_window]||o.delivery_window||'&mdash;')+'</b></span><span>placed <b>'+when+'</b></span><span>est <b>$'+Number(o.est_groceries||0).toFixed(2)+'</b></span></div>';
+    const statLabel = paid ? 'paid — check out' : o.status.replace('_',' ');
+    const card=document.createElement('div'); card.className='qcard '+st+(paid?' paidcard':'');
+    const totalLine = paid ? ('<span>paid <b>$'+Number(o.total_charged||0).toFixed(2)+'</b></span>') : ('<span>est <b>$'+Number(o.est_groceries||0).toFixed(2)+'</b></span>');
+    card.innerHTML='<div class="top"><div class="cust">'+(o.customer_name||'customer')+'<small>&#128205; '+(o.address||'')+'</small></div><div class="stat '+st+'">'+statLabel+'</div></div><div class="meta"><span>&#128340; <b>'+(winMap[o.delivery_window]||o.delivery_window||'&mdash;')+'</b></span><span>placed <b>'+when+'</b></span>'+totalLine+'</div>';
     card.onclick=()=>openPick(o.id);
     list.appendChild(card);
   });
@@ -139,10 +148,36 @@ function renderQueue(){
 sb.channel('fr-orders-live').on('postgres_changes',{event:'*',schema:'public',table:'fr_orders'}, payload=>{
   const o=payload.new||payload.old;
   if(payload.eventType==='DELETE'){ delete ORDERS[o.id]; }
-  else { ORDERS[o.id]=o; if(o.id===currentOrder && o.status==='approved'){ onApproved(); } }
+  else {
+    const prev = ORDERS[o.id];
+    ORDERS[o.id]=o;
+    const nowPaid = (o.status==='paid' || o.status==='approved');
+    const wasPaid = prev && (prev.status==='paid' || prev.status==='approved');
+    // fire the "paid" notification the moment it flips, regardless of which screen we're on
+    if(nowPaid && !wasPaid){
+      notifyPaid(o);
+      if(o.id===currentOrder){ onApproved(); }
+    }
+  }
   renderQueue();
   if(payload.eventType==='INSERT'){ toast('&#128309; new order from '+(o.customer_name||'a customer')); }
 }).subscribe();
+
+function notifyPaid(o){
+  toast('&#128176; '+(o.customer_name||'customer')+' paid $'+Number(o.total_charged||0).toFixed(2)+' &mdash; check out now!');
+  // audible + vibrate cue so alex notices even if not looking
+  try{ beep(); }catch(e){}
+  if(navigator.vibrate) navigator.vibrate([120,60,120]);
+}
+// tiny beep via WebAudio
+function beep(){
+  const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return;
+  const ctx=new AC(); const o=ctx.createOscillator(); const g=ctx.createGain();
+  o.connect(g); g.connect(ctx.destination); o.type='sine'; o.frequency.value=880;
+  g.gain.setValueAtTime(0.001,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.25,ctx.currentTime+0.02);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4);
+  o.start(); o.stop(ctx.currentTime+0.42);
+}
 
 async function openPick(orderId){
   currentOrder=orderId; const o=ORDERS[orderId];
@@ -154,6 +189,7 @@ async function openPick(orderId){
   if(error){ console.error(error); return; }
   ITEMS=data; renderItems();
   document.getElementById('pick').classList.add('show');
+  if(o.status==='paid'||o.status==='approved'){ onApproved(); }
 }
 function closePick(){ document.getElementById('pick').classList.remove('show'); currentOrder=null; loadQueue(); }
 

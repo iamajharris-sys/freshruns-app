@@ -184,7 +184,7 @@ async function openPick(orderId){
   document.getElementById('pName').textContent=o.customer_name||'customer';
   document.getElementById('pWindow').textContent=(o.delivery_window||'')+' delivery';
   document.getElementById('pAddr').innerHTML='&#128205; <b>'+(o.address||'')+'</b>';
-  if(o.status==='placed'){ await sb.from('fr_orders').update({status:'shopping',shopper:'alex'}).eq('id',orderId); o.status='shopping'; }
+  if(o.status==='placed'){ await sb.from('fr_orders').update({status:'shopping',shopper:'alex',shopping_at:new Date().toISOString()}).eq('id',orderId); o.status='shopping'; }
   const { data, error } = await sb.from('fr_order_items').select('*').eq('order_id',orderId).order('created_at',{ascending:true});
   if(error){ console.error(error); return; }
   ITEMS=data; renderItems();
@@ -290,6 +290,22 @@ function onApproved(){
   const btn=document.getElementById('pReq');
   btn.className='reqbtn approved';btn.textContent='\u2705 paid \u2014 check out at register now';btn.disabled=true;
   toast('\u{1F4B3} customer paid! check out & scan receipt');
+  // show a "mark delivered" button for the driver handoff
+  let d=document.getElementById('pDelivered');
+  if(!d){
+    d=document.createElement('button'); d.id='pDelivered'; d.className='reqbtn';
+    d.style.marginTop='10px'; d.style.background='var(--navy)';
+    d.textContent='\u{1F69A} mark delivered';
+    d.onclick=markDelivered;
+    btn.parentNode.appendChild(d);
+  } else { d.style.display='block'; }
+}
+async function markDelivered(){
+  if(!currentOrder) return;
+  await sb.from('fr_orders').update({status:'delivered', delivered_at:new Date().toISOString()}).eq('id',currentOrder);
+  toast('\u{1F389} delivered! nice run.');
+  const d=document.getElementById('pDelivered'); if(d) d.style.display='none';
+  setTimeout(closePick, 900);
 }
 let _tt;
 function toast(msg){const t=document.getElementById('toast');t.innerHTML=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2600);}

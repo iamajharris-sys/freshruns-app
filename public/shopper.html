@@ -201,12 +201,25 @@ loadQueue(); }
 
 function isNote(it){ return it.name && it.name.indexOf('(note)')===0; }
 
+// map section keys -> readable labels. old orders stored display names, so fall back to the raw value.
+const SECTION_LABELS = {
+  frozen:'frozen', a1:'breads & soup', a2:'spices & oils', a3:'pasta & sauce',
+  a4:'snacks', a5:'juice & water', a6:'vitamins & paper', a7:'misc',
+  centerA:'vegetables', centerB:'fruits & veg', centerC:'nuts & snacks',
+  east1:'butcher & deli', east2:'cheese & soups', east3:'drinks'
+};
+// walk order through the store, so the pick list matches the aisles
+const SECTION_ORDER = ['frozen','a1','a2','a3','a4','a5','a6','a7',
+  'centerA','centerB','centerC','east1','east2','east3'];
+function secLabel(k){ return SECTION_LABELS[k] || k; }
+function secRank(k){ const i=SECTION_ORDER.indexOf(k); return i<0 ? 999 : i; }
+
 function renderItems(){
   const list=document.getElementById('pList'); list.innerHTML='';
   const secs={}, typed=[];
   ITEMS.forEach(it=>{ if(it.is_typed) typed.push(it); else (secs[it.section||'other']=secs[it.section||'other']||[]).push(it); });
-  Object.entries(secs).forEach(([sec,arr])=>{
-    const h=document.createElement('div');h.className='psec';h.textContent=sec;list.appendChild(h);
+  Object.entries(secs).sort((a,b)=>secRank(a[0])-secRank(b[0])).forEach(([sec,arr])=>{
+    const h=document.createElement('div');h.className='psec';h.textContent=secLabel(sec);list.appendChild(h);
     arr.forEach(it=>appendRow(list,it));
   });
   if(typed.length){

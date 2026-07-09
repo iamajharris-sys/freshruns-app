@@ -283,7 +283,7 @@ const SECTIONS = {
   a4:{name:'snacks',emoji:'\u{1F37F}',color:'#E4C05A',sub:'aisle 4',items:['tortilla chips','crackers','popcorn','granola bars','pretzels','cookies','dried fruit','trail mix','chocolate']},
   a5:{name:'juice & water',emoji:'\u{1F964}',color:'#5A9BD4',sub:'aisle 5',items:['sparkling water','orange juice','bottled water','kombucha','cold brew','coconut water','apple juice','lemonade']},
   a6:{name:'vitamins & paper',emoji:'\u{1F48A}',color:'#9B7FC7',sub:'aisle 6',items:['vitamin d3','magnesium','protein powder','collagen','probiotics','elderberry','paper towels','toilet paper','napkins','dish soap']},
-  a7:{name:'misc',emoji:'\u{1F6D2}',color:'#8FA3B8',sub:'aisle 7',items:[]},
+  a7:{name:'misc',emoji:'\u{1F6D2}',color:'#8FA3B8',sub:'aisle 7',items:['laundry detergent','hand soap','sponges','trash bags','foil','parchment paper','batteries','ziploc bags','paper plates','sunscreen']},
   centerA:{name:'vegetables',emoji:'\u{1F966}',color:'#5FB868',sub:'center island',items:['baby spinach','broccoli','romaine lettuce','kale','zucchini','bell peppers','carrots','celery','cucumber','asparagus','brussels sprouts']},
   centerB:{name:'fruits & veg',emoji:'\u{1F34E}',color:'#E2704A',sub:'center island',items:['bananas','gala apples','oranges','strawberries','blueberries','grapes','roma tomatoes','avocados','lemons','yellow onions','garlic']},
   centerC:{name:'nuts & snacks',emoji:'\u{1F330}',color:'#B08A5E',sub:'bulk bins',items:['raw almonds','cashews','walnuts','rolled oats','quinoa','dark chocolate almonds','dried mango','pistachios','sunflower seeds']},
@@ -554,7 +554,7 @@ const PRICE = {
   'coffee':9.99,'cereal':4.49,'oatmeal':3.99,'pancake mix':3.49,'maple syrup':7.99,'tea':4.49,'granola':4.99,
   'sparkling water':4.99,'orange juice':4.49,'kombucha':3.49,'cold brew':4.99,'coconut water':3.99,'ginger ale':2.99,'soda':2.49,
   'soy sauce':3.49,'salsa':3.99,'curry paste':3.49,'coconut milk':2.49,'rice noodles':2.99,'tahini':6.99,'sriracha':4.49,
-  'frozen berries':4.99,'ice cream':5.49,'frozen pizza':6.99,'frozen veggies':2.99,'waffles':3.99,'frozen burritos':4.49,'veggie burgers':5.49,'frozen fish':9.99
+  'frozen berries':4.99,'ice cream':5.49,'frozen pizza':6.99,'frozen veggies':2.99,'waffles':3.99,'frozen burritos':4.49,'veggie burgers':5.49,'frozen fish':9.99,
   'alfredo sauce':4.99,
   'apple juice':4.49,
   'asparagus':3.99,
@@ -601,6 +601,15 @@ const PRICE = {
   'zucchini':1.99,
   'frozen shrimp':9.99,
   'frozen fries':3.99,
+  'laundry detergent':12.99,
+  'hand soap':4.49,
+  'sponges':3.99,
+  'trash bags':9.99,
+  'foil':4.99,
+  'parchment paper':4.49,
+  'batteries':7.99,
+  'ziploc bags':4.99,
+  'paper plates':5.49,
 };
 const DEFAULT_EST = 3.50;
 
@@ -618,7 +627,7 @@ function buildOrderModel(){
       const est=(PRICE[nm]||DEFAULT_EST)*q; estTotal+=est;
       return {nm,q,est};
     });
-    groups.push({name:s.name.replace(/&[a-z]+;/g,'').trim(), emoji:s.emoji, lines, note});
+    groups.push({key:k, name:s.name.replace(/&[a-z]+;/g,'').trim(), emoji:s.emoji, lines, note});
   });
   return {groups, extras:EXTRAS.slice(), estTotal};
 }
@@ -780,12 +789,12 @@ async function saveOrderToSupabase(){
   model.groups.forEach(g=>{
     g.lines.forEach(l=>{
       rows.push({
-        order_id: orderId, section: g.name, name: l.nm, qty: l.q,
+        order_id: orderId, section: g.key, name: l.nm, qty: l.q,
         is_typed:false, est_price: Number((l.est / l.q).toFixed(2)), item_status:'pending'
       });
     });
     if(g.note){
-      rows.push({ order_id: orderId, section: g.name, name:'(note) '+g.note,
+      rows.push({ order_id: orderId, section: g.key, name:'(note) '+g.note,
         qty:1, is_typed:false, note:g.note, item_status:'pending' });
     }
   });
